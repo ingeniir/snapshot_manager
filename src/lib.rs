@@ -26,6 +26,50 @@ impl Snapshot {
     }
 }
 
+// ---- History Manager ----
+
+struct HistoryManager {
+    dossier_sauvegarde: std::path::PathBuf,
+    
+}
+
+impl HistoryManager {
+    pub fn new(path: String) -> Self {
+        HistoryManager {
+            dossier_sauvegarde: std::path::PathBuf::from(path),
+        }
+    }
+
+    pub fn create_folder(&self) -> std::io::Result<()> {
+        std::fs::create_dir_all(&self.dossier_sauvegarde)
+    }
+
+    pub fn save_snapshot(&self, snapshot: &Snapshot) -> Result<(), String> {
+        let filename = format!("snapshot_{}.json", snapshot.id);
+        let filepath = self.dossier_sauvegarde.join(filename);
+        let json = snapshot.to_json().map_err(|e| e.to_string())?;
+        std::fs::write(filepath, json).map_err(|e| e.to_string())
+    }
+
+    pub fn load_all_snapshots(&self) -> Result<Vec<Snapshot>, String> {
+        let mut snapshots = Vec::new();
+        let entries = std::fs::read_dir(&self.dossier_sauvegarde).map_err(|e| e.to_string())?;
+        
+        for entry in entries {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+
+            if path.is_file() {
+                let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+                let snapshot = Snapshot::from_json(&content).map_err(|e| e.to_string())?;
+                snapshots.push(snapshot);
+            }
+        }
+        snapshots.sort_by(|a, b| b.timestamp.cmp(&a.timestamp)); // Tri par ordre décroissant de timestamp
+        Ok(snapshots)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*; // Permet d'importer ta structure Snapshot dans le module de test
